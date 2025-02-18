@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 cgcore = { path = "../cgcore" }
+dasp_signal = "0.11.0"
 
 [profile.release]
 lto = "thin"
