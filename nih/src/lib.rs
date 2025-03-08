@@ -1,7 +1,7 @@
+use cgcore::{Processor, Trig, MAX_BLOCK_SIZE};
+use dasp_signal::{noise, Noise};
 use nih_plug::prelude::*;
 use std::sync::Arc;
-use cgcore::{Trig, Processor, MAX_BLOCK_SIZE};
-use dasp_signal::{noise, Noise};
 
 struct CycleGripper {
     params: Arc<CycleGripperParams>,
@@ -14,19 +14,28 @@ struct CycleGripper {
 
 impl Default for CycleGripper {
     fn default() -> Self {
-        Self { params: Arc::new(CycleGripperParams::default()), processor: None, inputs: vec![], outputs: vec![], trigs: vec![], noise: noise(0) }
+        Self {
+            params: Arc::new(CycleGripperParams::default()),
+            processor: None,
+            inputs: vec![],
+            outputs: vec![],
+            trigs: vec![],
+            noise: noise(0),
+        }
     }
 }
 
 #[derive(Params)]
 struct CycleGripperParams {
     #[id = "drywet"]
-    pub drywet: FloatParam
+    pub drywet: FloatParam,
 }
 
 impl Default for CycleGripperParams {
     fn default() -> Self {
-        Self { drywet: FloatParam::new("DryWet", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })}
+        Self {
+            drywet: FloatParam::new("DryWet", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 }),
+        }
     }
 }
 
@@ -56,7 +65,12 @@ impl Plugin for CycleGripper {
         self.params.clone()
     }
 
-    fn initialize(&mut self, _audio_io_layout: &AudioIOLayout, buffer_config: &BufferConfig, _context: &mut impl InitContext<Self>) -> bool {
+    fn initialize(
+        &mut self,
+        _audio_io_layout: &AudioIOLayout,
+        buffer_config: &BufferConfig,
+        _context: &mut impl InitContext<Self>,
+    ) -> bool {
         let processor = Processor::new(buffer_config.sample_rate as f64);
         self.processor = Some(processor);
         self.inputs = vec![vec![0_f32; MAX_BLOCK_SIZE]; 2];
@@ -67,7 +81,12 @@ impl Plugin for CycleGripper {
 
     fn reset(&mut self) {}
 
-    fn process(&mut self, buffer: &mut Buffer, _aux: &mut AuxiliaryBuffers, context: &mut impl ProcessContext<Self>) -> ProcessStatus {
+    fn process(
+        &mut self,
+        buffer: &mut Buffer,
+        _aux: &mut AuxiliaryBuffers,
+        context: &mut impl ProcessContext<Self>,
+    ) -> ProcessStatus {
         for buf in self.inputs.iter_mut() {
             for item in buf.iter_mut() {
                 *item = 0.0;
@@ -79,25 +98,34 @@ impl Plugin for CycleGripper {
             }
         }
         // We're going to copy the mono input channel to all processor ins for now
-        for (in_copy, in_proc) in self.inputs.as_mut_slice().iter_mut().zip(buffer.as_slice().iter()) {
+        for (in_copy, in_proc) in self
+            .inputs
+            .as_mut_slice()
+            .iter_mut()
+            .zip(buffer.as_slice().iter())
+        {
             for (sample, copy) in in_proc.iter().zip(in_copy.iter_mut()) {
                 *copy = *sample;
             }
         }
-
 
         let block_size = buffer.samples();
         self.trigs.clear();
         while let Some(event) = context.next_event() {
             match event {
                 NoteEvent::NoteOn { note, .. } => {
-                    println!("Note: {:?}", note);
                     if note == 60 {
                         let length = (self.noise.next_sample() * 0.5 + 0.5) * 0.15 + 0.02;
-                        let trig = Trig {offset: event.timing().clamp(0, block_size as u32) as f32, length: Some(length as f32)};
+                        let trig = Trig {
+                            offset: event.timing().clamp(0, block_size as u32) as f32,
+                            length: Some(length as f32),
+                        };
                         self.trigs.push(trig);
                     } else {
-                        let trig = Trig {offset: event.timing().clamp(0, block_size as u32) as f32, length: None};
+                        let trig = Trig {
+                            offset: event.timing().clamp(0, block_size as u32) as f32,
+                            length: None,
+                        };
                         self.trigs.push(trig);
                     }
                 }
@@ -105,16 +133,24 @@ impl Plugin for CycleGripper {
             }
         }
 
-        let inputs_to_process = [&self.inputs.get(0).unwrap()[0..block_size], &self.inputs.get(1).unwrap()[0..block_size]];
+        let drywet = self.params.drywet.value();
+        let inputs_to_process = [
+            &self.inputs.get(0).unwrap()[0..block_size],
+            &self.inputs.get(1).unwrap()[0..block_size],
+        ];
         let outputs_to_process = &mut self.outputs;
-        self.processor.as_mut().unwrap().process(inputs_to_process, outputs_to_process, self.trigs.as_slice());
+        self.processor.as_mut().unwrap().process(
+            inputs_to_process,
+            outputs_to_process,
+            self.trigs.as_slice(),
+            drywet,
+        );
 
         for (processor_out, plugin_out) in self.outputs.iter().zip(buffer.as_slice().iter_mut()) {
             for i in 0..block_size {
                 *plugin_out.get_mut(i).unwrap() = *processor_out.get(i).unwrap();
             }
         }
-
 
         ProcessStatus::Normal
     }
