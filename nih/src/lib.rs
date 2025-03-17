@@ -97,7 +97,7 @@ impl Plugin for CycleGripper {
                 *item = 0.0;
             }
         }
-        // We're going to copy the mono input channel to all processor ins for now
+
         for (in_copy, in_proc) in self
             .inputs
             .as_mut_slice()
@@ -158,7 +158,8 @@ impl Plugin for CycleGripper {
 
 impl ClapPlugin for CycleGripper {
     const CLAP_ID: &'static str = "com.camsexton.cyclegripper";
-    const CLAP_DESCRIPTION: Option<&'static str> = Some("Cycle gripping");
+    const CLAP_DESCRIPTION: Option<&'static str> =
+        Some("Sam Pluta's CycleGripper effect as a CLAP plugin");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_FEATURES: &'static [ClapFeature] = &[ClapFeature::AudioEffect, ClapFeature::Stereo];
